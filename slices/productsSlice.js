@@ -18,10 +18,17 @@ const fakeApi = () =>
         }, 2000);
     });
 
-// 1. Tạo thunk
 export const fetchProducts = createAsyncThunk("products/fetchProducts", async() => {
-    const data = await fakeApi(); // chờ 2 giây
-    return data; // → thành action.payload
+    const res = await fetch("https://dummyjson.com/products?limit=10");
+    if (!res.ok) throw new Error(`Lỗi ${res.status}`); // fetch không tự báo lỗi 404/500
+    const data = await res.json();
+
+    // API trả về { products: [...] }, mỗi sp có "title" chứ không phải "name"
+    return data.products.map((p) => ({
+        id: p.id,
+        name: p.title,
+        price: p.price,
+    }));
 });
 
 // 2. Slice có status + error
