@@ -1,98 +1,109 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+import { useEffect } from "react";
+import {
+  View,
+  Text,
+  Button,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  addToCart,
+  increaseQuantity,
+  decreaseQuantity,
+  removeFromCart,
+  clearCart,
+  selectCartItems,
+  selectCartCount,
+  selectCartTotal,
+} from "../../slices/cartSlice";
+import { fetchProducts } from "../../slices/productsSlice";
 
 export default function HomeScreen() {
+  const dispatch = useDispatch();
+
+  // Giỏ hàng
+  const cartItems = useSelector(selectCartItems);
+  const cartCount = useSelector(selectCartCount);
+  const total = useSelector(selectCartTotal);
+
+  // Sản phẩm (từ thunk)
+  const products = useSelector((state: any) => state.products.items);
+  const status = useSelector((state: any) => state.products.status);
+  const error = useSelector((state: any) => state.products.error);
+
+  // Gọi "API" 1 lần khi mở màn hình
+  useEffect(() => {
+    if (status === "idle") {
+      dispatch(fetchProducts() as any);
+    }
+  }, [status, dispatch]);
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>🛒 Giỏ hàng ({cartCount})</Text>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+      {/* ===== DANH SÁCH SẢN PHẨM ===== */}
+      <Text style={styles.heading}>Sản phẩm</Text>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+      {/* pending */}
+      {status === "loading" && (
+        <View>
+          <ActivityIndicator size="large" />
+          <Text>Đang tải sản phẩm...</Text>
+        </View>
+      )}
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      {/* rejected */}
+      {status === "failed" && (
+        <View>
+          <Text style={{ color: "red" }}>Lỗi: {error}</Text>
+          <Button title="Thử lại" onPress={() => dispatch(fetchProducts() as any)} />
+        </View>
+      )}
+
+      {/* fulfilled */}
+      {status === "succeeded" &&
+        products.map((p: any) => (
+          <View key={p.id} style={styles.row}>
+            <Text>{p.name}: ${p.price}</Text>
+            <Button title="Thêm" onPress={() => dispatch(addToCart(p))} />
+          </View>
+        ))}
+
+      {/* ===== GIỎ HÀNG ===== */}
+      <Text style={styles.heading}>Trong giỏ</Text>
+      {cartItems.length === 0 ? (
+        <Text>Giỏ hàng trống</Text>
+      ) : (
+        <View>
+          {cartItems.map((item: any) => (
+            <View key={item.id} style={styles.row}>
+              <Text>{item.name}</Text>
+              <Button title="-" onPress={() => dispatch(decreaseQuantity(item.id))} />
+              <Text>{item.quantity}</Text>
+              <Button title="+" onPress={() => dispatch(increaseQuantity(item.id))} />
+              <Text>${item.price * item.quantity}</Text>
+              <Button
+                title="Xóa"
+                color="red"
+                onPress={() => dispatch(removeFromCart(item.id))}
+              />
+            </View>
+          ))}
+          <Text style={styles.total}>Tổng tiền: ${total}</Text>
+          <Button title="Xóa tất cả" onPress={() => dispatch(clearCart())} />
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  container: { padding: 16, paddingTop: 50, backgroundColor: "#fff" },
+  title: { fontSize: 24, fontWeight: "bold" },
+  heading: { fontSize: 18, fontWeight: "bold", marginTop: 20, marginBottom: 8 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  total: { fontSize: 18, fontWeight: "bold", marginVertical: 12 },
 });
